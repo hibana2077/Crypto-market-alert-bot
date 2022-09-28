@@ -16,7 +16,7 @@
 
 # 備註跟未來更新
 <li>增加交易所，預計增加：FTX,Bybit,AAX</li>
-<li>增加Discord機器人</li>
+<li>增加Discord的webhook機器人</li>
 <li>增加使用者介面</li>
 <li>抓一些小蟲</li>
 
