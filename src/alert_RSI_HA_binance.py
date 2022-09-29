@@ -1,3 +1,21 @@
+#  (`-').->   _      <-.(`-')   (`-')  _  <-. (`-')_  (`-')  _                                          
+#  (OO )__   (_)      __( OO)   (OO ).-/     \( OO) ) (OO ).-/                                          
+# ,--. ,'-'  ,-(`-') '-'---.\   / ,---.   ,--./ ,--/  / ,---.    .----.    .----.   .-------. .-------. 
+# |  | |  |  | ( OO) | .-. (/   | \ /`.\  |   \ |  |  | \ /`.\  \_,-.  |  /  ..  \  |   _   ' |   _   ' 
+# |  `-'  |  |  |  ) | '-' `.)  '-'|_.' | |  . '|  |) '-'|_.' |    .' .' |  /  \  . `-' /  /  `-' /  /  
+# |  .-.  | (|  |_/  | /`'.  | (|  .-.  | |  |\    | (|  .-.  |  .'  /_  '  \  /  '    .  /      .  /   
+# |  | |  |  |  |'-> | '--'  /  |  | |  | |  | \   |  |  | |  | |      |  \  `'  /    /  /      /  /    
+# `--' `--'  `--'    `------'   `--' `--' `--'  `--'  `--' `--' `------'   `---''    `--'      `--'     
+
+#   _        _____     _____   _      
+#  | |      |  __ \   / ____| | |     
+#  | |      | |__) | | |  __  | |     
+#  | |      |  ___/  | | |_ | | |     
+#  | |____  | |      | |__| | | |____ 
+#  |______| |_|       \_____| |______|
+                                    
+
+VERSION = '1.0.1'
 from talib import abstract
 import time , ccxt , requests , fake_useragent ,schedule
 import pandas as pd
@@ -57,7 +75,7 @@ f_rsiHeikinAshi(_length) =>
 '''
 def f_rsiHeikinAshi(_legth,close,highs,lows,i_smoothing):
     _closeRSI = f_zrsi(close,_legth)
-    _openRSI = _closeRSI#problem here 
+    _openRSI = _closeRSI[-1]#problem here ==> fixed
     _highRSI_raw = f_zrsi(highs,_legth)
     _lowRSI_raw = f_zrsi(lows,_legth)#
     _highRSI = np.maximum(_highRSI_raw,_lowRSI_raw)
@@ -104,21 +122,21 @@ def combine_message(timeframe,over_buy_symbols,over_sell_symbols,keyword):
     if len(over_buy_symbols) == 0 and len(over_sell_symbols) == 0:
         return f'''
         ===== RSI Heikin Ashi 指標信號提醒 =====
-        当前周期 {timeframe}min:
+        当前周期 {timeframe}:
         📊沒有超買超賣的交易對。
         🤖以上是机器指标，仅供参考，不作为交易依据。
         ⏰Time : {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}
         🗝️keyword: {keyword}
         ==================================='''
     else:
-        os = '\n\t'.join(over_sell_symbols)
-        ob = '\n\t'.join(over_buy_symbols)
+        os = '\n\t\t\t'.join(over_sell_symbols)
+        ob = '\n\t\t\t'.join(over_buy_symbols)
         message = f'''
         ===== RSI Heikin Ashi 指標信號提醒 =====
         來自 Binance 交易所的資料
-        当前周期 {timeframe}min:
-        📉下列品种收线在超卖区:\n{os}\n
-        📈下列品种收线在超买区:\n{ob}\n
+        当前周期 {timeframe}:
+        📉下列品种收线在超卖区:\n\t\t\t{os}\n
+        📈下列品种收线在超买区:\n\t\t\t{ob}\n
         🤖以上是机器指标，仅供参考，不作为交易依据。
         ⏰Time : {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}
         🗝️keyword: {keyword}
@@ -126,7 +144,7 @@ def combine_message(timeframe,over_buy_symbols,over_sell_symbols,keyword):
         '''
     return message
 
-def indicator(value,overbuy,oversell):return (True,'sell') if value > overbuy else (True,'buy') if value < oversell else (False,'hold')
+def indicator(value,overbuy,oversell):return (True,'overbuy') if value > overbuy else (True,'oversell') if value < oversell else (False,'hold')
 
 def do(symbol , timeframe , limit , params:dict):
     over_buy_symbols = []
@@ -141,7 +159,7 @@ def do(symbol , timeframe , limit , params:dict):
         df = df.iloc[-1:]
         status, trend = indicator(df['rsiHA_Close'].values[0],overbuy=params['over_buy'],oversell=params['over_sell'])
         if status:
-            if trend == 'buy':
+            if trend == 'overbuy':
                 over_buy_symbols.append(t)
             else:
                 over_sell_symbols.append(t)
@@ -169,8 +187,19 @@ def main(symbol_list,timeframe,length,params):
     except Exception as e:
         print(e)
 
+def delay():
+    s = time.time()
+    _ = binance.fetch_ticker('ADA/USDT')['last']
+    e = time.time()
+    return f"{e-s:.3f}s"
 
 if __name__ == '__main__':
+    print('=== 系統啟動 ===')
+    print(f'系統時間: {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}')
+    print(f'系統版本: {VERSION}')
+    print(f'系統狀態: 啟動中')
+    print(f'系統延遲: {delay()}')
+    print('================')
     symbol_list = input("請輸入幣種代號(以空格分隔)(如要使用全部幣種請輸入ALL):")
     binance.load_markets()
     symbol_list = symbol_list.split(' ') if symbol_list != 'ALL' else [t for t in binance.symbols if t.endswith('USDT')]
