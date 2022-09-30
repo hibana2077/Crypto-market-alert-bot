@@ -14,6 +14,10 @@
 <b>3 到 7</b> : 這是指標的參數設定，原始指標來自TV上的<a href='https://www.tradingview.com/script/1o4oWbEx-Heikin-Ashi-RSI-Oscillator/'>指標</a> </br>
 <b> 關鍵字 </b> : 釘釘機器人的安全設定，詳情請見<a href="https://open.dingtalk.com/document/robots/customize-robot-security-settings">這裡</a> </br>
 
+# 結果展示
+<img src="https://media.discordapp.net/attachments/868759966431973416/1025199996703883374/unknown.png"/>
+<img src="https://media.discordapp.net/attachments/868759966431973416/1025200086784933898/unknown.png"/>
+
 # 備註跟未來更新
 <li>增加交易所，預計增加：FTX,Bybit,AAX</li>
 <li>增加Discord的webhook機器人</li>
