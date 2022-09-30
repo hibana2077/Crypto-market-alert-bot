@@ -15,7 +15,7 @@
 #  |______| |_|       \_____| |______|
                                     
 
-VERSION = '1.0.5'
+VERSION = '1.0.8'
 from talib import abstract
 import time , ccxt , requests , fake_useragent ,schedule
 import pandas as pd
