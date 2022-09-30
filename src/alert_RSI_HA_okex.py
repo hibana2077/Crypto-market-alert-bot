@@ -16,12 +16,13 @@
                                     
                                     
 VERSION = '1.0.5'
+from pprint import pprint
 from talib import abstract
 import time , ccxt , requests , fake_useragent ,schedule
 import pandas as pd
 import numpy as np
 
-webhool_url=input("請輸入webhook網址:")
+WEBHOOK_URL=input("請輸入webhook網址:")
 
 okex = ccxt.okex5({
     'enableRateLimit': True,
@@ -83,7 +84,7 @@ def f_rsiHeikinAshi(_legth,close,highs,lows,i_smoothing):
     return [_open,_high,_low,_close]
 
 
-def send_webhook(message:str,url:str):
+def send_webhook(message:str):
     data = {
         'msgtype': 'text',
         'text': {
@@ -95,14 +96,15 @@ def send_webhook(message:str,url:str):
         'User-Agent': ua.random,
         'Content-Type': 'application/json',
     }
-    result = requests.post(url, json=data , headers=headers)
+    result = requests.post(WEBHOOK_URL, json=data , headers=headers)
     if result.status_code != 200:
         print("Webhook failed with status code: " + str(result.status_code))
         print("Message: " + message)
-        print("URL: " + url)
+        print("URL: " + WEBHOOK_URL)
         print("Response: " + result.text)
         return False
     else:
+        pprint(result.json())
         print("Webhook sent successfully")
         return True
 
@@ -114,25 +116,22 @@ plotcandle(O, H, L, C, '附图蜡烛', bodyColour, wickColour, bordercolor=bodyC
 '''
 
 def combine_message(timeframe,over_buy_symbols,over_sell_symbols,keyword):
-    try :
-        os = '\n\t\t\t\t'.join(over_sell_symbols)
-        ob = '\n\t\t\t\t'.join(over_buy_symbols)
-        message = f'''
-        ===== RSI Heikin Ashi 指標信號提醒 =====
-        來自 Okex(歐易) 交易所的資料
-        当前周期 {timeframe}min:
-        📉下列品种收线在超卖区:\n\t\t\t\t{os}\n
-        📈下列品种收线在超买区:\n\t\t\t\t{ob}\n
-        🤖以上是机器指标，仅供参考，不作为交易依据。
-        ⏰Time : {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}
-        🗝️keyword: {keyword}
-        ===================================
-        '''
-    except Exception as e:
-        print(e)
+    os = '\n\t\t\t\t'.join(over_sell_symbols)
+    ob = '\n\t\t\t\t'.join(over_buy_symbols)
+    message = f'''
+    ===== RSI Heikin Ashi 指標信號提醒 =====
+    來自 Okex(歐易) 交易所的資料
+    当前周期 {timeframe}min:
+    📉下列品种收线在超卖区:\n\t\t\t\t{os}\n
+    📈下列品种收线在超买区:\n\t\t\t\t{ob}\n
+    🤖以上是机器指标，仅供参考，不作为交易依据。
+    ⏰Time : {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}
+    🗝️keyword: {keyword}
+    ===================================
+    '''
     return message
 
-def indicator(value,overbuy,oversell):return (True,'overbuy') if value > overbuy else (True,'oversell') if value < oversell else (False,'hold')
+def indicator(value,overbuy,oversell):return (True,'overbuy') if value >= overbuy else (True,'oversell') if value <= oversell else (False,'hold')
 
 def do(symbol , timeframe , limit , params:dict):
     over_buy_symbols = []
@@ -144,19 +143,20 @@ def do(symbol , timeframe , limit , params:dict):
         df['time'] = pd.to_datetime(df['time'],unit='ms')
         df.set_index('time',inplace=True)
         df['rsiHA_Open'],df['rsiHA_High'],df['rsiHA_Low'],df['rsiHA_Close'] = f_rsiHeikinAshi(limit,df['close'],df['high'],df['low'],i_smoothing=params['smooth_length'])
-        df = df.iloc[-1:]
-        status, trend = indicator(df['rsiHA_Close'].values[0],overbuy=params['over_buy'],oversell=params['over_sell'])
+        status, trend = indicator(df['rsiHA_Close'][-1],overbuy=params['over_buy'],oversell=params['over_sell'])
         if status:
             if trend == 'overbuy':
-                over_buy_symbols.append(f"{t} : RSI_HA_CLOSE {df['rsiHA_Close'].values[0]} REAL CLOSE {df['close'].values[0]}")
+                over_buy_symbols.append(f"{t} : RSI_CLOSE {df['rsiHA_Close'][-1]:.3f} REAL_CLOSE {df['close'][-1]:.3f}")
             else:
-                over_sell_symbols.append(f"{t} : RSI_HA_CLOSE {df['rsiHA_Close'].values[0]} REAL CLOSE {df['close'].values[0]}")
+                over_sell_symbols.append(f"{t} : RSI_CLOSE {df['rsiHA_Close'][-1]:.3f} REAL_CLOSE {df['close'][-1]:.3f}")
         else:
             pass
     end = time.time()
     if len(over_buy_symbols) > 0 or len(over_sell_symbols) > 0:
         message = combine_message(timeframe,over_buy_symbols,over_sell_symbols,params['keyword'])
-        send_webhook(message,params['webhook'])
+        send_webhook(message)
+    else:
+        print(f'No signal in {timeframe}min')
     print(f'總共耗时{end-start}秒')
     return (True,'Done')
 
@@ -168,20 +168,25 @@ def main(symbol_list,timeframe,length,params):
         e = time.time()
         report = f'''
         ===== 效能報告 =====
-        總共耗時: {e-s:.3f}秒
-        狀態: {status}
-        訊息: {message}
-        總共檢測交易對: {len(symbol_list)}
+        ⏰總共耗時: {e-s:.3f}秒
+        ▶️狀態: {status}
+        📨訊息: {message}
+        🪧總共檢測交易對: {len(symbol_list)}
         ==================='''
         print(report)
     except Exception as e:
         print(e)
+        print("Error")
 
 def delay():
     s = time.time()
     _ = okex.fetch_ticker('ADA/USDT:USDT')['last']
     e = time.time()
     return f"{e-s:.3f}s"
+
+def sorted_by_trades(symbol_list):
+    symbol_list.sort(key=lambda x:(okex.fetch_ohlcv(x,timeframe='1d',limit=2)[0][-1])*sum(okex.fetch_ohlcv(x,timeframe='1d',limit=2)[0][1:-1:])/4,reverse=True)
+    return symbol_list
 
 if __name__ == '__main__':
     print('=== 系統啟動 ===')
@@ -193,12 +198,17 @@ if __name__ == '__main__':
     symbol_list = input("請輸入幣種代號(以空格分隔)(如要使用全部幣種請輸入ALL):")
     okex.load_markets()
     symbol_list = symbol_list.split(' ') if symbol_list != 'ALL' else [t for t in okex.symbols if t.endswith(':USDT')]
+    print(f'總共有{len(symbol_list)}個幣種，正在排序中...')
+    symbol_list = sorted_by_trades(symbol_list)[:int(input('請輸入排名:'))]
+    print(f'排序完成!')
     length = int(input("請輸入長度:"))
     smooth_length = int(input("請輸入平滑長度:"))
     over_buy = int(input("請輸入超買門檻:"))
     over_sell = int(input("請輸入超賣門檻:"))
     timeframe = int(input("請輸入時間框架:"))
     keyword = input("請輸入關鍵字:")
+    print('================')
+    print('系統狀態: 啟動完成')
     schedule.every(timeframe).minutes.at(":01").do(main,symbol_list=symbol_list,timeframe=timeframe,length=length,params={'smooth_length': smooth_length,'over_buy': over_buy,'over_sell': over_sell,'timeframe': timeframe,'keyword':keyword})
     while True:
         schedule.run_pending()

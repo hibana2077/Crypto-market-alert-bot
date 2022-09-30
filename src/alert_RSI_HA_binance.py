@@ -140,14 +140,13 @@ def do(symbol , timeframe , limit , params:dict):
         df['time'] = pd.to_datetime(df['time'],unit='ms')
         df.set_index('time',inplace=True)
         df['rsiHA_Open'],df['rsiHA_High'],df['rsiHA_Low'],df['rsiHA_Close'] = f_rsiHeikinAshi(limit,df['close'],df['high'],df['low'],i_smoothing=params['smooth_length'])
-        if df['rsiHA_Close'].iloc[-1] == 50 or df['rsiHA_Close'].iloc == -50:continue
         df = df.iloc[-1:]
         status, trend = indicator(df['rsiHA_Close'].values[0],overbuy=params['over_buy'],oversell=params['over_sell'])
         if status:
             if trend == 'overbuy':
-                over_buy_symbols.append(f"{t} : RSI_CLOSE {df['rsiHA_Close'].values[0]} REAL CLOSE {df['close'].values[0]}")
+                over_buy_symbols.append(f"{t} : RSI_CLOSE {df['rsiHA_Close'].values[0]:.3f} REAL CLOSE {df['close'].values[0]:.3f}")
             else:
-                over_sell_symbols.append(f"{t} : RSI_CLOSE  {df['rsiHA_Close'].values[0]} REAL CLOSE {df['close'].values[0]}")
+                over_sell_symbols.append(f"{t} : RSI_CLOSE  {df['rsiHA_Close'].values[0]:.3f} REAL CLOSE {df['close'].values[0]:.3f}")
         else:
             pass
     end = time.time()
@@ -179,6 +178,10 @@ def delay():
     e = time.time()
     return f"{e-s:.3f}s"
 
+def sorted_by_trades(symbol_list):
+    symbol_list.sort(key=lambda x:(binance.fetch_ohlcv(x,timeframe='1d',limit=2)[0][-1])*sum(binance.fetch_ohlcv(x,timeframe='1d',limit=2)[0][1:-1:])/4,reverse=True)
+    return symbol_list
+
 if __name__ == '__main__':
     print('=== 系統啟動 ===')
     print(f'系統時間: {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}')
@@ -189,12 +192,18 @@ if __name__ == '__main__':
     symbol_list = input("請輸入幣種代號(以空格分隔)(如要使用全部幣種請輸入ALL):")
     binance.load_markets()
     symbol_list = symbol_list.split(' ') if symbol_list != 'ALL' else [t for t in binance.symbols if t.endswith('USDT')]
+    print(f'總共有{len(symbol_list)}個幣種，正在排序中...')
+    symbol_list = sorted_by_trades(symbol_list)[:int(input('請輸入排名:'))]
+    for t in ['BTS/USDT','SC/USDT','TLM/USDT'] : symbol_list.remove(t)
+    print(f'排序完成!')
     length = int(input("請輸入長度:"))
     smooth_length = int(input("請輸入平滑長度:"))
     over_buy = int(input("請輸入超買門檻:"))
     over_sell = int(input("請輸入超賣門檻:"))
     timeframe = int(input("請輸入時間框架:"))
     keyword = input("請輸入關鍵字:")
+    print('================')
+    print('系統狀態: 啟動完成')
     schedule.every(timeframe).minutes.at(":01").do(main,symbol_list=symbol_list,timeframe=timeframe,length=length,params={'smooth_length': smooth_length,'over_buy': over_buy,'over_sell': over_sell,'timeframe': timeframe,'keyword':keyword})
     while True:
         schedule.run_pending()
