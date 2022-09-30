@@ -15,7 +15,8 @@
 #  |______| |_|       \_____| |______|
                                     
 
-VERSION = '1.0.1'
+VERSION = '1.0.2'
+from pprint import pprint
 from talib import abstract
 import time , ccxt , requests , fake_useragent ,schedule
 import pandas as pd
@@ -75,7 +76,7 @@ f_rsiHeikinAshi(_length) =>
 '''
 def f_rsiHeikinAshi(_legth,close,highs,lows,i_smoothing):
     _closeRSI = f_zrsi(close,_legth)
-    _openRSI = _closeRSI[-1]#problem here ==> fixed
+    _openRSI = _closeRSI[-1] if _closeRSI[-1] != np.NaN else _closeRSI[-2] #changed
     _highRSI_raw = f_zrsi(highs,_legth)
     _lowRSI_raw = f_zrsi(lows,_legth)#
     _highRSI = np.maximum(_highRSI_raw,_lowRSI_raw)
@@ -86,7 +87,6 @@ def f_rsiHeikinAshi(_legth,close,highs,lows,i_smoothing):
     _high = np.maximum(_highRSI,np.maximum(_open,_close))
     _low = np.minimum(_lowRSI,np.minimum(_open,_close))
     return [_open,_high,_low,_close]
-
 
 def send_webhook(message:str,url:str):
     data = {
@@ -146,12 +146,14 @@ def combine_message(timeframe,over_buy_symbols,over_sell_symbols,keyword):
 
 def indicator(value,overbuy,oversell):return (True,'overbuy') if value > overbuy else (True,'oversell') if value < oversell else (False,'hold')
 
+
+
 def do(symbol , timeframe , limit , params:dict):
     over_buy_symbols = []
     over_sell_symbols = []
     start = time.time()
     for t in symbol:
-        ohlcv = binance.fetch_ohlcv(t,timeframe=timeframe,limit=limit*3)
+        ohlcv = binance.fetch_ohlcv(t,timeframe=timeframe,limit=limit*4)
         df = pd.DataFrame(ohlcv,columns=['time','open','high','low','close','volume'])
         df['time'] = pd.to_datetime(df['time'],unit='ms')
         df.set_index('time',inplace=True)
@@ -160,9 +162,9 @@ def do(symbol , timeframe , limit , params:dict):
         status, trend = indicator(df['rsiHA_Close'].values[0],overbuy=params['over_buy'],oversell=params['over_sell'])
         if status:
             if trend == 'overbuy':
-                over_buy_symbols.append(t)
+                over_buy_symbols.append(f"{t} : RSI_CLOSE {df['rsiHA_Close'].values[0]} REAL CLOSE {df['close'].values[0]}")
             else:
-                over_sell_symbols.append(t)
+                over_sell_symbols.append(f"{t} : RSI_CLOSE  {df['rsiHA_Close'].values[0]} REAL CLOSE {df['close'].values[0]}")
         else:
             pass
     end = time.time()
@@ -202,7 +204,8 @@ if __name__ == '__main__':
     print('================')
     symbol_list = input("請輸入幣種代號(以空格分隔)(如要使用全部幣種請輸入ALL):")
     binance.load_markets()
-    symbol_list = symbol_list.split(' ') if symbol_list != 'ALL' else [t for t in binance.symbols if t.endswith('USDT')]
+    symbol_list = symbol_list.split(' ') if symbol_list != 'ALL' else [(t,sum([jk[-1] for jk in binance.fetch_ohlcv(t,timeframe='12h',limit=2)])/2) for t in binance.symbols if t.endswith('USDT')]
+    symbol_list = [t[0] for t in sorted(symbol_list,key=lambda x:x[1],reverse=True)][:int(input("請輸入前幾成交量排名："))] if symbol_list != 'ALL' else symbol_list
     length = int(input("請輸入長度:"))
     smooth_length = int(input("請輸入平滑長度:"))
     over_buy = int(input("請輸入超買門檻:"))
