@@ -15,8 +15,7 @@
 #  |______| |_|       \_____| |______|
                                     
 
-VERSION = '1.0.2'
-from pprint import pprint
+VERSION = '1.0.5'
 from talib import abstract
 import time , ccxt , requests , fake_useragent ,schedule
 import pandas as pd
@@ -30,12 +29,6 @@ binance = ccxt.binance({
         'defaultType': 'future',
     },
 })
-
-def timestamp_to_minet(timestamp):
-    return time.strftime("%M", time.localtime(timestamp))
-
-def timestamp_to_datetime(timestamp):
-    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
 
 '''
 f_zrsi(_source, _length) =>
@@ -119,34 +112,23 @@ plotcandle(O, H, L, C, '附图蜡烛', bodyColour, wickColour, bordercolor=bodyC
 '''
 
 def combine_message(timeframe,over_buy_symbols,over_sell_symbols,keyword):
-    if len(over_buy_symbols) == 0 and len(over_sell_symbols) == 0:
-        return f'''
-        ===== RSI Heikin Ashi 指標信號提醒 =====
-        当前周期 {timeframe}:
-        📊沒有超買超賣的交易對。
-        🤖以上是机器指标，仅供参考，不作为交易依据。
-        ⏰Time : {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}
-        🗝️keyword: {keyword}
-        ==================================='''
-    else:
-        os = '\n\t\t\t'.join(over_sell_symbols)
-        ob = '\n\t\t\t'.join(over_buy_symbols)
-        message = f'''
-        ===== RSI Heikin Ashi 指標信號提醒 =====
-        來自 Binance 交易所的資料
-        当前周期 {timeframe}:
-        📉下列品种收线在超卖区:\n\t\t\t{os}\n
-        📈下列品种收线在超买区:\n\t\t\t{ob}\n
-        🤖以上是机器指标，仅供参考，不作为交易依据。
-        ⏰Time : {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}
-        🗝️keyword: {keyword}
-        ===================================
-        '''
+    os = '\n\t\t\t'.join(over_sell_symbols)
+    ob = '\n\t\t\t'.join(over_buy_symbols)
+    message = f'''
+    ===== RSI Heikin Ashi 指標信號提醒 =====
+    來自 Binance 交易所的資料
+    当前周期 {timeframe}:
+    📉下列品种收线在超卖区:\n\t\t\t{os}\n
+    📈下列品种收线在超买区:\n\t\t\t{ob}\n
+    🤖以上是机器指标，仅供参考，不作为交易依据。
+    ⏰Time : {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}
+    🗝️keyword: {keyword}
+    ===================================
+    '''
     return message
 
+
 def indicator(value,overbuy,oversell):return (True,'overbuy') if value > overbuy else (True,'oversell') if value < oversell else (False,'hold')
-
-
 
 def do(symbol , timeframe , limit , params:dict):
     over_buy_symbols = []
@@ -158,6 +140,7 @@ def do(symbol , timeframe , limit , params:dict):
         df['time'] = pd.to_datetime(df['time'],unit='ms')
         df.set_index('time',inplace=True)
         df['rsiHA_Open'],df['rsiHA_High'],df['rsiHA_Low'],df['rsiHA_Close'] = f_rsiHeikinAshi(limit,df['close'],df['high'],df['low'],i_smoothing=params['smooth_length'])
+        if df['rsiHA_Close'].iloc[-1] == 50 or df['rsiHA_Close'].iloc == -50:continue
         df = df.iloc[-1:]
         status, trend = indicator(df['rsiHA_Close'].values[0],overbuy=params['over_buy'],oversell=params['over_sell'])
         if status:
@@ -168,7 +151,8 @@ def do(symbol , timeframe , limit , params:dict):
         else:
             pass
     end = time.time()
-    send_webhook(message=combine_message(timeframe,over_buy_symbols,over_sell_symbols, keyword=params['keyword']),url=webhool_url)
+    if len(over_buy_symbols)+len(over_sell_symbols) == 0:print(f"no overbuy oversell symbol.")
+    else:send_webhook(message=combine_message(timeframe,over_buy_symbols,over_sell_symbols, keyword=params['keyword']),url=webhool_url)
     print(f'總共耗时{end-start}秒')
     return (True,'Done')
 
@@ -204,8 +188,7 @@ if __name__ == '__main__':
     print('================')
     symbol_list = input("請輸入幣種代號(以空格分隔)(如要使用全部幣種請輸入ALL):")
     binance.load_markets()
-    symbol_list = symbol_list.split(' ') if symbol_list != 'ALL' else [(t,sum([jk[-1] for jk in binance.fetch_ohlcv(t,timeframe='12h',limit=2)])/2) for t in binance.symbols if t.endswith('USDT')]
-    symbol_list = [t[0] for t in sorted(symbol_list,key=lambda x:x[1],reverse=True)][:int(input("請輸入前幾成交量排名："))] if symbol_list != 'ALL' else symbol_list
+    symbol_list = symbol_list.split(' ') if symbol_list != 'ALL' else [t for t in binance.symbols if t.endswith('USDT')]
     length = int(input("請輸入長度:"))
     smooth_length = int(input("請輸入平滑長度:"))
     over_buy = int(input("請輸入超買門檻:"))
@@ -216,8 +199,3 @@ if __name__ == '__main__':
     while True:
         schedule.run_pending()
         time.sleep(1)
-
-
-'''
-candel = [ timestamp, open, high, low, close, volume ]
-'''
