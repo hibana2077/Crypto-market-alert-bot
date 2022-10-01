@@ -194,7 +194,7 @@ if __name__ == '__main__':
     symbol_list = symbol_list.split(' ') if symbol_list != 'ALL' else [t for t in binance.symbols if t.endswith('USDT')]
     print(f'總共有{len(symbol_list)}個幣種，正在排序中...')
     symbol_list = sorted_by_trades(symbol_list)[:int(input('請輸入排名:'))]
-    for t in ['BTS/USDT','SC/USDT','TLM/USDT'] : symbol_list.remove(t)
+    for t in ['BTS/USDT','SC/USDT','TLM/USDT'] : symbol_list.remove(t) if t in symbol_list else None
     print(f'排序完成!')
     length = int(input("請輸入長度:"))
     smooth_length = int(input("請輸入平滑長度:"))
@@ -202,6 +202,9 @@ if __name__ == '__main__':
     over_sell = int(input("請輸入超賣門檻:"))
     timeframe = int(input("請輸入時間框架:"))
     keyword = input("請輸入關鍵字:")
+    programe_start_time = int(input("請輸入程式延遲啟動時間(如要立即啟動請輸入0)(分鐘):"))
+    print(f'程式將在{programe_start_time}分鐘後啟動')
+    time.sleep(programe_start_time*60)
     print('================')
     print('系統狀態: 啟動完成')
     schedule.every(timeframe).minutes.at(":01").do(main,symbol_list=symbol_list,timeframe=timeframe,length=length,params={'smooth_length': smooth_length,'over_buy': over_buy,'over_sell': over_sell,'timeframe': timeframe,'keyword':keyword})
