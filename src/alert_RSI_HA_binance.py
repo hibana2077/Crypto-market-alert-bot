@@ -15,7 +15,7 @@
 #  |______| |_|       \_____| |______|
                                     
 
-VERSION = '1.0.8'
+VERSION = '1.0.9'
 from talib import abstract
 import time , ccxt , requests , fake_useragent ,schedule
 import pandas as pd
@@ -182,6 +182,11 @@ def sorted_by_trades(symbol_list):
     symbol_list.sort(key=lambda x:(binance.fetch_ohlcv(x,timeframe='1d',limit=2)[0][-1])*sum(binance.fetch_ohlcv(x,timeframe='1d',limit=2)[0][1:-1:])/4,reverse=True)
     return symbol_list
 
+#add this
+def daily_reflash():
+    global symbol_list
+    symbol_list = sorted_by_trades(symbol_list)
+
 if __name__ == '__main__':
     print('=== 系統啟動 ===')
     print(f'系統時間: {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}')
@@ -203,10 +208,11 @@ if __name__ == '__main__':
     timeframe = int(input("請輸入時間框架:"))
     keyword = input("請輸入關鍵字:")
     programe_start_time = int(input("請輸入程式延遲啟動時間(如要立即啟動請輸入0)(分鐘):"))
-    print(f'程式將在{programe_start_time}分鐘後啟動')
+    print(f'程式將在{programe_start_time}分鐘後啟動') if programe_start_time != 0 else print('程式立即啟動')
     time.sleep(programe_start_time*60)
     print('================')
     print('系統狀態: 啟動完成')
+    schedule.every().day.at("09:09").do(daily_reflash)#add this
     schedule.every(timeframe).minutes.at(":01").do(main,symbol_list=symbol_list,timeframe=timeframe,length=length,params={'smooth_length': smooth_length,'over_buy': over_buy,'over_sell': over_sell,'timeframe': timeframe,'keyword':keyword})
     while True:
         schedule.run_pending()
