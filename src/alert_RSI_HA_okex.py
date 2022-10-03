@@ -15,7 +15,7 @@
 #  |______| |_|       \_____| |______|
                                     
                                     
-VERSION = '1.0.9'
+VERSION = '1.0.10'
 from pprint import pprint
 from talib import abstract
 import time , ccxt , requests , fake_useragent ,schedule
@@ -131,8 +131,8 @@ def combine_message(timeframe,over_buy_symbols,over_sell_symbols,keyword):
     '''
     return message
 
-def SMA(symbol,period):
-    day_data = okex.fetch_ohlcv(symbol, timeframe='1d', limit=period*2)
+def SMA(symbol,period,timeframe):
+    day_data = okex.fetch_ohlcv(symbol, timeframe=timeframe, limit=period*2)
     day_data = pd.DataFrame(day_data, columns=['time', 'open', 'high', 'low', 'close', 'volume'])
     day_data['time'] = pd.to_datetime(day_data['time'], unit='ms')
     day_data.set_index('time', inplace=True)
@@ -155,9 +155,9 @@ def do(symbol , timeframe , limit , params:dict):
         status, trend = indicator(df['rsiHA_Close'][-1],overbuy=params['over_buy'],oversell=params['over_sell'])
         if status:
             if trend == 'overbuy':
-                over_buy_symbols.append(f"{t[:-10]} : RSI_CLOSE {df['rsiHA_Close'][-1]:.3f} {SMA(t,params['sma_period'])}")
+                over_buy_symbols.append(f"{t[:-10]} : RSI_CLOSE {df['rsiHA_Close'][-1]:.3f} {SMA(t,params['sma_period'],params['sma_time_period])}")
             else:
-                over_sell_symbols.append(f"{t[:-10]} : RSI_CLOSE {df['rsiHA_Close'][-1]:.3f} {SMA(t,params['sma_period'])}")
+                over_sell_symbols.append(f"{t[:-10]} : RSI_CLOSE {df['rsiHA_Close'][-1]:.3f} {SMA(t,params['sma_period'],params['sma_time_period])}")
         else:
             pass
     end = time.time()
@@ -230,6 +230,7 @@ if __name__ == '__main__':
     over_sell = int(input("請輸入超賣門檻:"))
     timeframe = int(input("請輸入時間框架:"))
     sma_period = int(input("請輸入SMA週期:"))
+    sma_time_period = str(input("請輸入SMA時間週期:"))
     keyword = input("請輸入關鍵字:")
     programe_start_time = int(input("請輸入程式延遲啟動時間(如要立即啟動請輸入0)(分鐘):"))
     print(f'程式將在{programe_start_time}分鐘後啟動')
@@ -238,7 +239,7 @@ if __name__ == '__main__':
     print('系統狀態: 啟動完成')
     schedule.every().day.at("09:09").do(daily_reflash)#add this
     schedule.every().saturday.at("09:09").do(show_my_wallet)#add this
-    schedule.every(timeframe).minutes.at(":01").do(main,symbol_list=symbol_list,timeframe=timeframe,length=length,params={'smooth_length': smooth_length,'over_buy': over_buy,'over_sell': over_sell,'timeframe': timeframe,'keyword':keyword,'sma_period':sma_period})
+    schedule.every(timeframe).minutes.at(":01").do(main,symbol_list=symbol_list,timeframe=timeframe,length=length,params={'smooth_length': smooth_length,'over_buy': over_buy,'over_sell': over_sell,'timeframe': timeframe,'keyword':keyword,'sma_period':sma_period,'sma_time_period':sma_time_period})
     while True:
         schedule.run_pending()
         time.sleep(1)
